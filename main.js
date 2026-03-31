@@ -95,33 +95,38 @@ grid.display = (function() {
 //// MAIN LOOP ////
 
 grid.display();
-let intervalID = 0;
+let intervalID;
 const INTERVAL = 250;
 let intervals = 1;
 
 startButton.addEventListener('click', () => {
-  intervalID = setInterval(() => {
-    if (rndBernoulli()) {
-      // get alteration of pattern
-      // animate change (in less than INTERVAL length)
-      grid.alter();
-      grid.display();
+  let anim = startButton.getAnimations()[0];
+  if (anim) anim.cancel();
 
-    } else {
-      // animate no change
-      intervals++;
-    }
-  }, INTERVAL);
-  console.log('started');
+  if (!intervalID) {
+    intervalID = setInterval(() => {
+      if (rndBernoulli()) {
+        grid.alter();
+        grid.display();
+
+      } else {
+        // animate no change
+        intervals++;
+      }
+    }, INTERVAL);
+    console.log('started');
+  }
 });
 
 stopButton.addEventListener('click', () => {
-  clearInterval(intervalID);
+  if (intervalID) {
+    clearInterval(intervalID);
+    intervalID = undefined;
+  }  
   console.log('stopped');
 });
 
 /////////////////
-
 
 function printPattern() {
   if (!this.iterations) 
