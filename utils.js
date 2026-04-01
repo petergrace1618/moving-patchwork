@@ -87,6 +87,11 @@ function easeInExpo(x) {
   return x === 0 ? 0 : Math.pow(2, 10 * x - 10);
 }
 
+function easeSinSqr(t, lo, hi) {
+  return lo + (hi - lo) * Math.sin(t * PI) ** 2;
+}
+
+
 // Given an object with properties x and y,
 // calculate the angle from the positive 
 // x-axis to the point (x,y)

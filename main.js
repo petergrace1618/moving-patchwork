@@ -1,23 +1,26 @@
+'use strict';
+
 //////////////////////////
 //// moving-patchwork ////
 //////////////////////////
 
 class Grid {
-  pattern;
+  #gridSize;
+  #maxCellSize;
+  #pattern;
   columns;
   rows;
-  #width;
-  #height;
 
   // gridSize: number of rows/columns
-  constructor(gridSize, maxCellUnits, initialSize) {
-    this.pattern = [
-      Array(gridSize).fill(initialSize),
-      Array(gridSize).fill(initialSize)
+  constructor(gridSize, maxCellSize, initialSize) {
+    this.#pattern = [
+      Array(gridSize).fill(initialSize),  // column widths
+      Array(gridSize).fill(initialSize)   // row heights
     ];
-    this.columns = this.pattern[0];
-    this.rows = this.pattern[1];
-    this.maxCellUnits = maxCellUnits;
+    this.columns = this.#pattern[0];
+    this.rows = this.#pattern[1];
+    this.#gridSize = gridSize;
+    this.#maxCellSize = maxCellSize;
   }
 
   get width() {
@@ -26,6 +29,24 @@ class Grid {
 
   get height() {
     return sum(this.rows);
+  }
+
+  get size() {
+    return this.#gridSize;
+  }
+
+  get maxCellSize() {
+    return this.#maxCellSize;
+  }
+
+  // rowColumn: 0 - column widths, 1 - row heights
+  // index: a particular cell
+  getRowColumnSize(rowColumn, index) {
+    return this.#pattern[rowColumn][index];
+  }
+
+  setRowColumnSize(rowColumn, index, size) {
+    this.#pattern[rowColumn][index] = constrain(size, 1, this.#gridSize);
   }
 }
 
@@ -39,9 +60,9 @@ Grid.prototype.display = function() {
         x = this.columns, y = this.rows;
 
   // horizontal lines
-  ctx.strokeStyle = '#ccc';
+  // ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.setLineDash([]);  // solid line
   let d = top;
   for (let i=0; i<y.length; i++) {
       ctx.moveTo(left, d);
@@ -68,9 +89,9 @@ Grid.prototype.display = function() {
 //// GLOBALS ////
 
 const ctx = canvas.getContext('2d', {alpha: false}),
-      PIXELS_PER_UNIT = 13,
-      TIME_UNIT = 1200,
-      TRANSITION_DURATION = 300;
+      PIXELS_PER_UNIT = 14,
+      TIME_UNIT = 1400,
+      TRANSITION_DURATION = 700;
 
 let idleDuration;
 let animationStart;
@@ -78,7 +99,7 @@ let stopRequested = false;
 
 //// START/STOP ANIMATION ////
 
-const grid = new Grid(7, 7, 1);
+const grid = new Grid(6, 6, 2);
 ctx.strokeStyle = '#222';
 grid.display();
 
@@ -103,6 +124,7 @@ function idle(timestamp) {
   if (!animationStart) {
     animationStart = timestamp;
     idleDuration = randomDuration();
+    // console.log()
   }
 
   if (stopRequested) {
@@ -114,11 +136,13 @@ function idle(timestamp) {
     return;
   }
 
+  // milliseconds
+  const ms = (timestamp % TIME_UNIT) / TIME_UNIT;
   const elapsed = timestamp - animationStart;
   let t = elapsed / idleDuration;
   if (t < 1.0) {
     clearCanvas();
-    updateIdle();
+    updateIdle(ms);
     grid.display();
     // drawDiagonals()
     requestAnimationFrame(idle);
@@ -130,30 +154,40 @@ function idle(timestamp) {
 }
 
 function updateIdle(t) {
-  ctx.strokeStyle = mapToHSL(idleDuration/TIME_UNIT*t, 0, 33, 66);
+  t = easeSinSqr(t, 25, 45);
+  ctx.strokeStyle = `hsl(0 ${t} ${t})`;
 }
 
-let prevBoxSize;
-let newBoxSize;
+////////////////////////
+
+let prevCellSize, newCellSize, rowColumn, index;
 
 function transition(timestamp) {
   if (!animationStart) {
     animationStart = timestamp;
-    // save previous state
-    prevBoxSize = grid.size;
-    // get new state
+
+    // 1. choose random row/column and index
+    rowColumn = +rndBool(); // 0: column, 1: row
+    index = rndInt(grid.size);
+
+    // 2. save previous cell size
+    prevCellSize = grid.getRowColumnSize(rowColumn, index);
+    
+    // 3. choose random delta and check for collision
     do {
       const d = rndInt(1,3) * (rndBool() ? 1 : -1);
-      newBoxSize = constrain(prevBoxSize + d, 1, grid.maxSize);
-    } while (newBoxSize == prevBoxSize);
-    console.log('prev', prevBoxSize, 'new', newBoxSize);
+      newCellSize = constrain(prevCellSize + d, 1, grid.maxCellSize);
+    } while (newCellSize == prevCellSize);
+    // console.log('prev', prevCellSize, 'new', newCellSize,
+    //             'rowColumn', rowColumn, 'index', index);
   }
 
+  const ms = (timestamp % TIME_UNIT) / TIME_UNIT;
   const elapsed = timestamp - animationStart;
   let t = Math.min(elapsed / TRANSITION_DURATION, 1.0);
   if (t < 1.0) {
     clearCanvas();
-    updateTransition(t);
+    updateTransition(t, ms);
     grid.display();
     requestAnimationFrame(transition);
   
@@ -171,18 +205,12 @@ function transition(timestamp) {
   }
 }
 
-function updateTransition(t) {
-    ctx.strokeStyle = mapToHSL(t, 120, 25, 50);
-    grid.size = lerp(prevBoxSize, newBoxSize, easeInQuad(t));
-}
-
-function alter() {
-    const a = rndBool() ? this.columns : this.rows;
-    const i = rndInt(a.length);
-    const d = rndInt(1,3) * (rndBool() ? 1 : -1);
-    a[i] = constrain(a[i] + d, 1, 7);
-    // this.#calcSize();
-  }
+function updateTransition(t, ms) {
+  const v = easeSinSqr(ms, 33, 66);
+  ctx.strokeStyle = `hsl(240 ${v} ${v})`;
+  const cellSize = lerp(prevCellSize, newCellSize, easeInQuad(t));
+  grid.setRowColumnSize(rowColumn, index, cellSize);
+}    
 
 // diagonals from corners of canvas to corners of grid
 function drawDiagonals() {
@@ -198,7 +226,9 @@ function drawDiagonals() {
   ctx.moveTo(0, canvas.height);
   ctx.lineTo(left, bottom);
   ctx.stroke();
+  ctx.setLineDash([]);  // solid line
 }
+
 /////////////////////////////
 
 function clearCanvas() {
