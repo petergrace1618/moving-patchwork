@@ -49,7 +49,7 @@ function rndInt(a, b) {
   }
 }
 
-function rndBernoulli() {
+function rndBool() {
   return rnd() >= 0.5 ? true : false;
 }
 
