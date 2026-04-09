@@ -90,8 +90,8 @@ Grid.prototype.display = function() {
 
 const ctx = canvas.getContext('2d', {alpha: false}),
       PIXELS_PER_UNIT = 14,
-      TIME_UNIT = 1400,
-      TRANSITION_DURATION = 700;
+      TIME_UNIT = 1000,
+      TRANSITION_DURATION = 500;
 
 let idleDuration;
 let animationStart;
@@ -140,6 +140,7 @@ function idle(timestamp) {
   const ms = (timestamp % TIME_UNIT) / TIME_UNIT;
   const elapsed = timestamp - animationStart;
   let t = elapsed / idleDuration;
+  
   if (t < 1.0) {
     clearCanvas();
     updateIdle(ms);
@@ -185,6 +186,7 @@ function transition(timestamp) {
   const ms = (timestamp % TIME_UNIT) / TIME_UNIT;
   const elapsed = timestamp - animationStart;
   let t = Math.min(elapsed / TRANSITION_DURATION, 1.0);
+  
   if (t < 1.0) {
     clearCanvas();
     updateTransition(t, ms);
@@ -237,13 +239,59 @@ function clearCanvas() {
 
 function randomDuration() {
   let n;
-  for (n = 1; rndBool() == false; n++);
+  for (n = 1; !rndBool(); n++);
   return n * TIME_UNIT;
 }
 
-// maps t (0..1) -> hsl() string
-// lo, hi: range of saturation and luminosity
-function mapToHSL(t, hue, lo, hi) {
-  t = lo + (hi - lo) * Math.sin(t * PI) ** 2;
-  return `hsl(${hue} ${t} ${t})`
+class RandomBits {
+  #bitStream;
+  #bitStreamIndex = 0;
+  #bitMask = 0b1;
+  #doubletStream;
+  #doubletStreamIndex = 0;
+  #doubletMask = 0b11;
+  #booleanStream;
+  #booleanStreamIndex = 0;
+  #booleanMask = 0b1;
+
+  constructor(n) {
+    this.#bitStream = new Uint32Array(n);
+    crypto.getRandomValues(this.#bitStream);
+    this.#booleanStream = new Uint32Array(n);
+    crypto.getRandomValues(this.#booleanStream);
+  }
+
+  boolean() {
+    let val = this.#booleanStream[this.#booleanStreamIndex] 
+              & this.#booleanMask;
+    this.#booleanMask <<= 1;
+    if (this.#booleanMask == 1) {
+      this.#booleanStreamIndex = 
+        (this.#booleanStreamIndex + 1) % this.#booleanStream.length;
+    }
+    return !!val;
+  }
+
+  bit() {
+    let val = this.#bitStream[this.#bitStreamIndex] & this.#bitMask;
+    this.#bitMask <<= 1;
+    if (this.#bitMask == 1) {
+      this.#bitStreamIndex = 
+        (this.#bitStreamIndex + 1) % this.#bitStream.length;
+    }
+    return +(val > 0);
+  }
+
+  bitStream() {
+    let a = [];
+    for (let i=0; i<this.#bitStream.length; i++) {
+      a.unshift(this.#bitStream[i].toString(2))
+    }
+    return a.toString();
+  }
+
+  bitStreamToString() {
+    let s = ''
+    
+  }
 }
